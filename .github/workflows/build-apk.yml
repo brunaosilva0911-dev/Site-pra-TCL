@@ -12,8 +12,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
     env:
-      GRADLE_USER_HOME: ${{ runner.temp }}/gradle-home
+      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle-home
 
     steps:
       - name: Checkout Code
@@ -34,7 +35,11 @@ jobs:
         run: npm install
 
       - name: Install pinned Capacitor 6 packages
-        run: npm install --no-save @capacitor/core@6.2.1 @capacitor/cli@6.2.1 @capacitor/android@6.2.1
+        run: |
+          npm install --no-save \
+            @capacitor/core@6.2.1 \
+            @capacitor/cli@6.2.1 \
+            @capacitor/android@6.2.1
 
       - name: Create Capacitor configuration
         run: |
@@ -64,7 +69,7 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: Configure Gradle for a clean, serial build
+      - name: Configure Gradle
         run: |
           mkdir -p android
           cat >> android/gradle.properties <<'EOF_GRADLE'
@@ -76,12 +81,16 @@ jobs:
           org.gradle.vfs.watch=false
           EOF_GRADLE
 
-      - name: Build debug APK
+      - name: Build Debug APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew --stop || true
-          ./gradlew clean assembleDebug --no-daemon --no-build-cache --max-workers=1 --stacktrace
+          ./gradlew clean assembleDebug \
+            --no-daemon \
+            --no-build-cache \
+            --max-workers=1 \
+            --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
