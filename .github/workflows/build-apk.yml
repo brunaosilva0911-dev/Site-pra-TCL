@@ -1,0 +1,64 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install Dependencies & Capacitor
+        run: |
+          npm install
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Create Capacitor Config
+        run: |
+          cat << 'EOF' > capacitor.config.ts
+          import type { CapacitorConfig } from '@capacitor/cli';
+          const config: CapacitorConfig = {
+            appId: 'com.vivatv.app',
+            appName: 'VIVA TV',
+            webDir: 'public',
+            server: {
+              url: 'https://site-pra-tcl.vercel.app',
+              cleartext: true
+            }
+          };
+          export default config;
+          EOF
+
+      - name: Add Android Platform & Sync
+        run: |
+          mkdir -p public
+          echo "<!-- temp -->" > public/index.html
+          npx cap add android
+          npx cap sync
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Build APK with Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          
