@@ -2,11 +2,19 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GRADLE_USER_HOME: ${{ runner.temp }}/gradle-home
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -14,57 +22,71 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
-      - name: Install Dependencies & Capacitor
-        run: |
-          npm install
-          npm install @capacitor/core @capacitor/cli @capacitor/android
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-      - name: Create Capacitor Config
+      - name: Install project dependencies
+        run: npm install
+
+      - name: Install pinned Capacitor 6 packages
+        run: npm install --no-save @capacitor/core@6.2.1 @capacitor/cli@6.2.1 @capacitor/android@6.2.1
+
+      - name: Create Capacitor configuration
         run: |
-          cat << 'EOF' > capacitor.config.ts
+          cat > capacitor.config.ts <<'EOF_CONFIG'
           import type { CapacitorConfig } from '@capacitor/cli';
+
           const config: CapacitorConfig = {
             appId: 'com.vivatv.app',
             appName: 'VIVA TV',
             webDir: 'public',
             server: {
               url: 'https://site-pra-tcl.vercel.app',
-              cleartext: true
+              cleartext: false
             }
           };
-          export default config;
-          EOF
 
-      - name: Add Android Platform & Sync
+          export default config;
+          EOF_CONFIG
+
+      - name: Prepare web directory
         run: |
           mkdir -p public
-          echo "<!-- temp -->" > public/index.html
+          printf '%s\n' '<!doctype html><html><head><meta charset="utf-8"></head><body></body></html>' > public/index.html
+
+      - name: Add Android platform and sync
+        run: |
           npx cap add android
-          npx cap sync
+          npx cap sync android
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Patch Gradle Properties to Avoid Concurrency Locks
+      - name: Configure Gradle for a clean, serial build
         run: |
-          cd android
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
-          echo "org.gradle.parallel=false" >> gradle.properties
-          echo "org.gradle.vfs.watch=false" >> gradle.properties
+          mkdir -p android
+          cat >> android/gradle.properties <<'EOF_GRADLE'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          org.gradle.parallel=false
+          org.gradle.workers.max=1
+          org.gradle.caching=false
+          org.gradle.configuration-cache=false
+          org.gradle.vfs.watch=false
+          EOF_GRADLE
 
-      - name: Build APK with Gradle Serial Execution
+      - name: Build debug APK
+        working-directory: android
         run: |
-          cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --max-workers=1
+          ./gradlew --stop || true
+          ./gradlew clean assembleDebug --no-daemon --no-build-cache --max-workers=1 --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: viva-tv-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
