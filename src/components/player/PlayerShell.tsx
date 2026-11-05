@@ -335,7 +335,6 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
             </div>}
             <ControlButton label={fullscreen ? "Sair da tela cheia" : "Tela cheia"} onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void rootRef.current?.requestFullscreen().catch(() => undefined); revealControls(); }}>{fullscreen ? <Minimize className="h-7 w-7" /> : <Maximize className="h-7 w-7" />}</ControlButton>
           </div>
-        </div>
         <p className="mt-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-white/25">{isEmbed ? "Use os controles da própria transmissão • Tela cheia disponível aqui" : "OK reproduz/pausa • Setas navegam • Voltar fecha os controles"}</p>
       </div>
 
