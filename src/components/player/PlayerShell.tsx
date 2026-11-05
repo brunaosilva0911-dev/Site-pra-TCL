@@ -331,6 +331,7 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
               {showQuality && <div data-focus-trap data-quality-menu role="menu" className="absolute bottom-20 right-0 w-72 rounded-2xl border border-white/15 bg-[#121718] p-3 shadow-2xl"><p className="px-4 py-2 text-xs font-black uppercase tracking-widest text-white/40">Qualidade</p>{[{ index: -1, label: "Automática" }, ...levels].map((level) => <button key={level.index} type="button" data-tv-focus="true" data-autofocus={quality === level.index ? "" : undefined} tabIndex={0} onClick={() => { if (hlsRef.current) hlsRef.current.currentLevel = level.index; setQuality(level.index); setShowQuality(false); window.setTimeout(() => rootRef.current?.querySelector<HTMLElement>("[data-quality-button]")?.focus(), 0); }} className={`tv-focus flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-lg font-semibold ${quality === level.index ? "bg-white/10 text-[#d9ff63]" : ""}`}>{level.label}{quality === level.index && <Check className="h-5 w-5" />}</button>)}</div>}
             </div>}
             
+            </div>
             </div>}
             <ControlButton label={fullscreen ? "Sair da tela cheia" : "Tela cheia"} onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void rootRef.current?.requestFullscreen().catch(() => undefined); revealControls(); }}>{fullscreen ? <Minimize className="h-7 w-7" /> : <Maximize className="h-7 w-7" />}</ControlButton>
           </div>
