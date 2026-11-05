@@ -26,7 +26,10 @@ export default async function WatchPage({ params }: { params: Promise<{ id: stri
     }
     const eventId = id.slice(7);
     const event = live.events.find((item) => item.id === eventId);
-    if (!event || !event.players[0]) notFound();
+    if (!event) notFound();
+    if (!event.players[0]) {
+      return <main className="grid min-h-screen place-items-center bg-[#080b0c] p-8 text-center text-white"><div className="max-w-xl"><h1 className="text-3xl font-black">Transmissão indisponível</h1><p className="mt-4 text-lg text-white/60">Este evento está na programação, mas ainda não possui um link de transmissão fornecido pela fonte.</p><a href="/esportes" className="mt-8 inline-flex rounded-full bg-[#d9ff63] px-6 py-3 font-bold text-black">Voltar aos esportes</a></div></main>;
+    }
     return <PlayerShell itemId={id} title={event.title} src={event.players[0]} poster={event.leagueImage} kind="event" isLive description={`${event.league} • ${event.homeTeam} x ${event.awayTeam}`} />;
   }
   notFound();

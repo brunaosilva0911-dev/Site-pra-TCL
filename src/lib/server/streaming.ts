@@ -130,12 +130,13 @@ export const getLivePayload = cache(async (): Promise<LivePayload> => {
   });
   const safeChannelIds = new Set(channels.map((channel) => channel.id));
 
-  const events: SportEvent[] = list(eventRaw).flatMap((entry) => {
+  const eventItems = Array.isArray(eventRaw) ? eventRaw : list(record(eventRaw).items ?? record(eventRaw).events);
+  const events: SportEvent[] = eventItems.flatMap((entry) => {
     const item = record(entry);
     const startsAt = safeDate(item.time_start ?? item.start_date ?? item.startsAt);
-    const endsAt = safeDate(item.time_end ?? item.end_date) ||
+    const endsAt = safeDate(item.time_end ?? item.end_date ?? item.endsAt) ||
       (startsAt ? new Date(new Date(startsAt).getTime() + 2 * 60 * 60 * 1000).toISOString() : "");
-    const league = record(item.league);
+    const league = typeof item.league === "object" ? record(item.league) : {};
     const teams = record(item.teams);
     const home = record(teams.home);
     const away = record(teams.away);
@@ -143,24 +144,21 @@ export const getLivePayload = cache(async (): Promise<LivePayload> => {
       blockedItems += 1;
       return [];
     }
-    const players = list(item.players).map(httpUrl).filter((url) => {
-      if (!url) return false;
-      const blocked = channels.length > 0 && !channels.some((channel) => url === channel.url || url.endsWith(`/${channel.id}`));
-      if (blocked) blockedItems += 1;
-      return !blocked;
-    });
+    // Event streams can use a different EmbedTV host from the channel directory.
+    // Keep valid HTTP(S) player URLs instead of comparing full hostnames/channel IDs.
+    const players = [...new Set(list(item.players).map(httpUrl).filter(Boolean))];
     return [{
       id: text(item.id),
       slug: text(item.slug, `evento-${text(item.id)}`),
       title: text(item.title, `${text(home.name, "Evento")} x ${text(away.name, "ao vivo")}`),
-      league: text(league.name, "Esportes"),
-      leagueImage: httpUrl(league.image) || undefined,
+      league: text(league.name ?? item.league, "Esportes"),
+      leagueImage: httpUrl(league.image ?? item.leagueImage) || undefined,
       startsAt,
       endsAt,
-      homeTeam: text(home.name, "Mandante"),
-      awayTeam: text(away.name, "Visitante"),
-      homeImage: httpUrl(home.image) || undefined,
-      awayImage: httpUrl(away.image) || undefined,
+      homeTeam: text(home.name ?? item.homeTeam, "Mandante"),
+      awayTeam: text(away.name ?? item.awayTeam, "Visitante"),
+      homeImage: httpUrl(home.image ?? item.homeImage) || undefined,
+      awayImage: httpUrl(away.image ?? item.awayImage) || undefined,
       players,
     }];
   }).sort((a, b) => a.startsAt.localeCompare(b.startsAt));

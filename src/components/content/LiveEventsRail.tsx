@@ -65,12 +65,23 @@ export function EventCard({ event, now, rowId, fluid = false }: { event: SportEv
 
 export function LiveEventsRail({ title = "Esportes ao vivo", events, rowId = "live-events" }: { title?: string; events: SportEvent[]; rowId?: string }) {
   const [now, setNow] = useState(() => Date.now());
+  const [currentEvents, setCurrentEvents] = useState(events);
+  useEffect(() => { setCurrentEvents(events); }, [events]);
   useEffect(() => {
-    const update = () => setNow(Date.now());
-    const timer = window.setInterval(update, 30000);
-    return () => window.clearInterval(timer);
+    const updateClock = () => setNow(Date.now());
+    const refreshEvents = async () => {
+      try {
+        const response = await fetch("/api/live?view=events", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (Array.isArray(data.items)) setCurrentEvents(data.items as SportEvent[]);
+      } catch { /* Keep the last successfully loaded schedule while offline. */ }
+    };
+    const clockTimer = window.setInterval(updateClock, 30000);
+    const refreshTimer = window.setInterval(refreshEvents, 5 * 60 * 1000);
+    return () => { window.clearInterval(clockTimer); window.clearInterval(refreshTimer); };
   }, []);
-  const visible = events.filter((event) => eventStatus(event, now) !== "ended").slice(0, 14);
+  const visible = currentEvents.filter((event) => eventStatus(event, now) !== "ended").slice(0, 14);
   if (!visible.length) return null;
   return (
     <section className="py-7" aria-labelledby={`${rowId}-heading`}>

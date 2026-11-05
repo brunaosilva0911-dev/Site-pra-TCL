@@ -54,6 +54,7 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
   const [sending, setSending] = useState(false);
   const [rate, setRate] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
+  const isEmbed = !/\.(?:m3u8|mp4|webm)(?:$|[?#])/i.test(src);
 
   const saveHistory = useCallback((beacon = false) => {
     const video = videoRef.current;
@@ -71,8 +72,12 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
     let networkRetried = false;
     let mediaRetried = false;
     const video = videoRef.current;
-    if (!video) return;
     setError(null); setReady(false); setBuffering(true); setLevels([]); setQuality(-1);
+    if (isEmbed) {
+      setBuffering(false);
+      return () => { cancelled = true; };
+    }
+    if (!video) return;
     video.pause();
     video.removeAttribute("src");
     video.load();
@@ -90,9 +95,10 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
       if (autoplay) tryPlay();
     };
 
-    const looksLikeMp4 = /\.mp4(?:$|\?)/i.test(src);
-    if (looksLikeMp4) setupNative();
-    else {
+    const isNativeFile = /\.(?:mp4|webm)(?:$|[?#])/i.test(src);
+    const isHls = /\.m3u8(?:$|[?#])/i.test(src);
+    if (isNativeFile) setupNative();
+    else if (isHls) {
       void import("hls.js").then(({ default: HlsEngine }) => {
         if (cancelled) return;
         if (HlsEngine.isSupported()) {
@@ -127,6 +133,9 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) setupNative();
         else { setError("Este navegador não oferece suporte a HLS. Atualize o WebView da Android TV e tente novamente."); setBuffering(false); }
       }).catch(() => { if (!cancelled) { setError("Não foi possível carregar o mecanismo de vídeo."); setBuffering(false); } });
+    } else {
+      setError("Formato de transmissão não reconhecido. A fonte precisa ser um vídeo MP4/WebM, uma playlist HLS ou um endereço de incorporação.");
+      setBuffering(false);
     }
 
     return () => {
@@ -212,11 +221,11 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
 
   const togglePlay = useCallback(() => {
     const video = videoRef.current;
-    if (!video || error) return;
+    if (!video || error || isEmbed) return;
     revealControls();
     if (video.paused) video.play().catch(() => setError("Não foi possível iniciar a reprodução. Tente novamente."));
     else video.pause();
-  }, [error, revealControls]);
+  }, [error, isEmbed, revealControls]);
 
   const seek = useCallback((seconds: number) => {
     const video = videoRef.current;
@@ -273,7 +282,9 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
   return (
     <div ref={rootRef} data-focus-trap tabIndex={-1} onKeyDown={onRootKeyDown} onMouseMove={revealControls}
       className="fixed inset-0 z-[100] overflow-hidden bg-black outline-none" aria-label={`Reprodutor: ${title}`}>
-      <video ref={videoRef} className="h-full w-full object-contain" poster={poster} playsInline preload="auto"
+      {isEmbed ? (
+        <iframe key={`${src}-${reloadKey}`} src={src} title={`Transmissão: ${title}`} className="h-full w-full border-0 bg-black" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" onLoad={() => { setReady(true); setBuffering(false); }} />
+      ) : <video ref={videoRef} className="h-full w-full object-contain" poster={poster} playsInline preload="auto"
         onClick={togglePlay}
         onPlay={() => { setPlaying(true); setBuffering(false); revealControls(); }}
         onPause={() => { setPlaying(false); setControlsVisible(true); saveHistory(); }}
@@ -287,7 +298,7 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
         onVolumeChange={(event) => { setVolume(event.currentTarget.volume); setMuted(event.currentTarget.muted); }}
         onEnded={() => { setPlaying(false); setControlsVisible(true); saveHistory(); }}
         onError={() => { if (!hlsRef.current && src) { setError("O vídeo não pôde ser carregado. Verifique sua conexão ou tente novamente."); setBuffering(false); } }}
-      />
+      />}
 
       {!ready && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center"><LoaderCircle className="h-16 w-16 animate-spin text-[#d9ff63]" /><span className="sr-only">Carregando vídeo</span></div>}
       {buffering && ready && !error && <div className="pointer-events-none absolute inset-0 grid place-items-center bg-black/15"><LoaderCircle className="h-14 w-14 animate-spin text-white" /></div>}
@@ -309,7 +320,7 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
           <span className="w-20 text-base font-semibold tabular-nums text-white/50">{formatTime(duration)}</span>
         </div>}
         <div className="flex items-center gap-2">
-          <ControlButton data-player-primary label={playing ? "Pausar" : "Reproduzir"} onClick={togglePlay} className="h-16 w-16 bg-[#d9ff63] text-black">{playing ? <Pause className="h-7 w-7 fill-current" /> : <Play className="ml-1 h-7 w-7 fill-current" />}</ControlButton>
+          {!isEmbed && <><ControlButton data-player-primary label={playing ? "Pausar" : "Reproduzir"} onClick={togglePlay} className="h-16 w-16 bg-[#d9ff63] text-black">{playing ? <Pause className="h-7 w-7 fill-current" /> : <Play className="ml-1 h-7 w-7 fill-current" />}</ControlButton>
           {!isLive && <><ControlButton label="Voltar 10 segundos" onClick={() => seek(-10)}><RotateCcw className="h-7 w-7" /><span className="absolute text-[9px] font-black">10</span></ControlButton><ControlButton label="Avançar 10 segundos" onClick={() => seek(10)}><RotateCw className="h-7 w-7" /><span className="absolute text-[9px] font-black">10</span></ControlButton></>}
           <ControlButton label={muted ? "Ativar som" : "Silenciar"} onClick={() => { const video = videoRef.current; if (video) { video.muted = !video.muted; revealControls(); } }}>{muted || volume === 0 ? <VolumeX className="h-7 w-7" /> : volume < 0.55 ? <Volume1 className="h-7 w-7" /> : <Volume2 className="h-7 w-7" />}</ControlButton>
           <input data-tv-focus="true" data-control="volume" tabIndex={0} type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} onChange={(event) => changeVolume(Number(event.target.value))} aria-label="Volume" className="mx-2 w-36" />
@@ -320,10 +331,11 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
               {showQuality && <div data-focus-trap data-quality-menu role="menu" className="absolute bottom-20 right-0 w-72 rounded-2xl border border-white/15 bg-[#121718] p-3 shadow-2xl"><p className="px-4 py-2 text-xs font-black uppercase tracking-widest text-white/40">Qualidade</p>{[{ index: -1, label: "Automática" }, ...levels].map((level) => <button key={level.index} type="button" data-tv-focus="true" data-autofocus={quality === level.index ? "" : undefined} tabIndex={0} onClick={() => { if (hlsRef.current) hlsRef.current.currentLevel = level.index; setQuality(level.index); setShowQuality(false); window.setTimeout(() => rootRef.current?.querySelector<HTMLElement>("[data-quality-button]")?.focus(), 0); }} className={`tv-focus flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-lg font-semibold ${quality === level.index ? "bg-white/10 text-[#d9ff63]" : ""}`}>{level.label}{quality === level.index && <Check className="h-5 w-5" />}</button>)}</div>}
             </div>}
             
+            </>}
             <ControlButton label={fullscreen ? "Sair da tela cheia" : "Tela cheia"} onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void rootRef.current?.requestFullscreen().catch(() => undefined); revealControls(); }}>{fullscreen ? <Minimize className="h-7 w-7" /> : <Maximize className="h-7 w-7" />}</ControlButton>
           </div>
         </div>
-        <p className="mt-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-white/25">OK reproduz/pausa • Setas navegam • Voltar fecha os controles</p>
+        <p className="mt-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-white/25">{isEmbed ? "Use os controles da própria transmissão • Tela cheia disponível aqui" : "OK reproduz/pausa • Setas navegam • Voltar fecha os controles"}</p>
       </div>
 
       {showChat && <aside className="absolute bottom-0 right-0 top-0 z-30 flex w-[480px] flex-col border-l border-white/10 bg-[#0c1011]/95 p-6 pt-28 shadow-2xl backdrop-blur-xl" aria-label="Chat desta sala">
