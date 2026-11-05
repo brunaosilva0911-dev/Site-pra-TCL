@@ -320,7 +320,7 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
           <span className="w-20 text-base font-semibold tabular-nums text-white/50">{formatTime(duration)}</span>
         </div>}
         <div className="flex items-center gap-2">
-          {!isEmbed && <><ControlButton data-player-primary label={playing ? "Pausar" : "Reproduzir"} onClick={togglePlay} className="h-16 w-16 bg-[#d9ff63] text-black">{playing ? <Pause className="h-7 w-7 fill-current" /> : <Play className="ml-1 h-7 w-7 fill-current" />}</ControlButton>
+          {!isEmbed && <div className="contents"><ControlButton data-player-primary label={playing ? "Pausar" : "Reproduzir"} onClick={togglePlay} className="h-16 w-16 bg-[#d9ff63] text-black">{playing ? <Pause className="h-7 w-7 fill-current" /> : <Play className="ml-1 h-7 w-7 fill-current" />}</ControlButton>
           {!isLive && <><ControlButton label="Voltar 10 segundos" onClick={() => seek(-10)}><RotateCcw className="h-7 w-7" /><span className="absolute text-[9px] font-black">10</span></ControlButton><ControlButton label="Avançar 10 segundos" onClick={() => seek(10)}><RotateCw className="h-7 w-7" /><span className="absolute text-[9px] font-black">10</span></ControlButton></>}
           <ControlButton label={muted ? "Ativar som" : "Silenciar"} onClick={() => { const video = videoRef.current; if (video) { video.muted = !video.muted; revealControls(); } }}>{muted || volume === 0 ? <VolumeX className="h-7 w-7" /> : volume < 0.55 ? <Volume1 className="h-7 w-7" /> : <Volume2 className="h-7 w-7" />}</ControlButton>
           <input data-tv-focus="true" data-control="volume" tabIndex={0} type="range" min={0} max={1} step={0.05} value={muted ? 0 : volume} onChange={(event) => changeVolume(Number(event.target.value))} aria-label="Volume" className="mx-2 w-36" />
@@ -331,7 +331,7 @@ export function PlayerShell({ itemId, title, src, poster, kind, isLive, descript
               {showQuality && <div data-focus-trap data-quality-menu role="menu" className="absolute bottom-20 right-0 w-72 rounded-2xl border border-white/15 bg-[#121718] p-3 shadow-2xl"><p className="px-4 py-2 text-xs font-black uppercase tracking-widest text-white/40">Qualidade</p>{[{ index: -1, label: "Automática" }, ...levels].map((level) => <button key={level.index} type="button" data-tv-focus="true" data-autofocus={quality === level.index ? "" : undefined} tabIndex={0} onClick={() => { if (hlsRef.current) hlsRef.current.currentLevel = level.index; setQuality(level.index); setShowQuality(false); window.setTimeout(() => rootRef.current?.querySelector<HTMLElement>("[data-quality-button]")?.focus(), 0); }} className={`tv-focus flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-lg font-semibold ${quality === level.index ? "bg-white/10 text-[#d9ff63]" : ""}`}>{level.label}{quality === level.index && <Check className="h-5 w-5" />}</button>)}</div>}
             </div>}
             
-            </>}
+            </div>}
             <ControlButton label={fullscreen ? "Sair da tela cheia" : "Tela cheia"} onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void rootRef.current?.requestFullscreen().catch(() => undefined); revealControls(); }}>{fullscreen ? <Minimize className="h-7 w-7" /> : <Maximize className="h-7 w-7" />}</ControlButton>
           </div>
         </div>
